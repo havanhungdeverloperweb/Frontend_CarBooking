@@ -94,13 +94,31 @@ export const fetchCustomerBookings = createAsyncThunk(
   ) => {
     try {
       const response = await StaffCustomerAPI.getCustomerBookings(customerId, params);
-      // API trả về { success, data: { customer, stats, bookings, pagination }, message }
+      // Backend trả về { success, data: { customer, bookings, statistics, pagination }, message }
       if (response.success && response.data) {
+        const backendCustomer = response.data.customer;
+        const backendStatistics = (response.data as any).statistics;
+
+        // UI đang đọc `customerStats`, nên map `statistics` từ backend sang đúng shape.
+        const mappedStats = backendStatistics
+          ? {
+              total_bookings: backendCustomer?.total_bookings ?? 0,
+              total_spent: backendCustomer?.total_spent ?? 0,
+              completed_bookings: backendStatistics.completed ?? 0,
+              cancelled_bookings: backendStatistics.cancelled ?? 0,
+            }
+          : {
+              total_bookings: backendCustomer?.total_bookings ?? 0,
+              total_spent: backendCustomer?.total_spent ?? 0,
+              completed_bookings: 0,
+              cancelled_bookings: 0,
+            };
+
         return {
-          customer: response.data.customer,
-          stats: response.data.stats,
+          customer: backendCustomer,
+          stats: mappedStats,
           bookings: response.data.bookings,
-          pagination: response.data.pagination
+          pagination: response.data.pagination,
         };
       }
       return rejectWithValue(response.message || 'Lỗi tải chuyến đi của khách hàng');

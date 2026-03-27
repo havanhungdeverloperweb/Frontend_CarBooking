@@ -23,6 +23,7 @@ export interface DriverTrip {
   end_time?: string | null;
   /** staff: NV phân công; driver: tài xế tự tạo */
   assignment_source?: TripAssignmentSource;
+  price?: number;
   payment_method?: 'cash' | 'transfer';
   payment_status?: 'pending' | 'paid_cash' | 'paid_transfer';
   paid_at?: string | null;

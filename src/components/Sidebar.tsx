@@ -1,4 +1,4 @@
-import { Calendar,Home, BarChart3, UserCheck, Car, Users, LogOut } from 'lucide-react';
+import { Calendar,Home, BarChart3, UserCheck, Car, Users, LogOut, CreditCard } from 'lucide-react';
 
 interface SidebarProps {
   activeTab: string;
@@ -59,8 +59,14 @@ export default function Sidebar({ activeTab, onTabChange, isOpen, onClose, staff
             <SidebarButton 
               onClick={() => { onTabChange('bookings'); onClose(); }} 
               icon={<Calendar size={20} />} 
-              label="Bookings" 
+              label="Đơn Hàng" 
               active={activeTab === 'bookings'} 
+            />
+            <SidebarButton 
+              onClick={() => { onTabChange('payments'); onClose(); }} 
+              icon={<CreditCard size={20} />} 
+              label="Thanh Toán" 
+              active={activeTab === 'payments'} 
             />
             <SidebarButton 
               onClick={() => { onTabChange('stats'); onClose(); }} 
@@ -71,19 +77,19 @@ export default function Sidebar({ activeTab, onTabChange, isOpen, onClose, staff
             <SidebarButton 
               onClick={() => { onTabChange('drivers'); onClose(); }} 
               icon={<UserCheck size={20} />} 
-              label="Drivers" 
+              label="Tài Xế" 
               active={activeTab === 'drivers'} 
             />
             <SidebarButton 
               onClick={() => { onTabChange('vehicles'); onClose(); }} 
               icon={<Car size={20} />} 
-              label="Vehicles" 
+              label="Phương Tiện" 
               active={activeTab === 'vehicles'} 
             />
             <SidebarButton 
               onClick={() => { onTabChange('customers'); onClose(); }} 
               icon={<Users size={20} />} 
-              label="Customers" 
+              label="Khách Hàng" 
               active={activeTab === 'customers'} 
             />
           </nav>

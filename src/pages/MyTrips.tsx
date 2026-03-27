@@ -2,8 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { 
   MapPin, Calendar, Car, Clock, ChevronRight, Search, 
   Ticket, ArrowLeft, Navigation, Phone, DollarSign, 
-  CheckCircle2, AlertCircle, History, Loader
+  CheckCircle2, AlertCircle, History, Loader, Star, Send
 } from 'lucide-react';
+import { useAppDispatch, useAppSelector } from '../redux/store';
+import { fetchReviewByBooking, submitReview } from '../redux/DriverReview/DriverReview.Slice';
 import { Link } from 'react-router-dom';
 
 import { Booking } from '../types/Booking.types';
@@ -14,6 +16,34 @@ export default function MyTrips() {
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const dispatch = useAppDispatch();
+  const { reviewsByBooking, submitting } = useAppSelector((state) => state.driverReview);
+
+  // Form state cho mỗi booking riêng biệt
+  const [reviewForm, setReviewForm] = useState<Record<string, { rating: number, comment: string }>>({});
+
+  const handleRatingChange = (bookingId: string, rating: number) => {
+    setReviewForm(prev => ({ ...prev, [bookingId]: { ...prev[bookingId], rating, comment: prev[bookingId]?.comment || '' } }));
+  };
+
+  const handleCommentChange = (bookingId: string, comment: string) => {
+    setReviewForm(prev => ({ ...prev, [bookingId]: { ...prev[bookingId], rating: prev[bookingId]?.rating || 0, comment } }));
+  };
+
+  const handleSubmitReview = async (bookingId: string) => {
+    const form = reviewForm[bookingId];
+    if (!form || form.rating === 0) {
+      alert('Vui lòng chọn số sao để đánh giá');
+      return;
+    }
+    try {
+      await dispatch(submitReview({ bookingId, rating: form.rating, comment: form.comment })).unwrap();
+      alert('Cảm ơn bạn đã đánh giá tài xế!');
+    } catch (err: any) {
+      alert(err || 'Có lỗi xảy ra khi gửi đánh giá');
+    }
+  };
 
   const handleSearch = async () => {
     if (!phone || phone.trim() === '') {
@@ -42,6 +72,13 @@ export default function MyTrips() {
         setTrips(result.data || []);
         if (result.data.length === 0) {
           setError('Không tìm thấy chuyến đi nào cho số điện thoại này');
+        } else {
+          // Fetch review state cho các chuyến hoàn thành
+          result.data.forEach((trip: Booking) => {
+            if (trip.status === 'completed') {
+              dispatch(fetchReviewByBooking(trip._id));
+            }
+          });
         }
       } else {
         setError(result.message || 'Không thể tải danh sách chuyến đi');
@@ -262,6 +299,67 @@ export default function MyTrips() {
                           </div>
                         )}
                       </div>
+
+                      {/* Phân vùng đánh giá khi hoàn thành */}
+                      {trip.status === 'completed' && (
+                        <div className="mt-4 pt-4 border-t border-blue-200">
+                          {reviewsByBooking[trip._id] ? (
+                            <div className="bg-white/60 p-3 rounded-xl">
+                              <div className="text-xs font-bold text-gray-500 uppercase mb-1">Đánh giá của bạn:</div>
+                              <div className="flex gap-1 mb-2">
+                                {[1, 2, 3, 4, 5].map(star => (
+                                  <Star 
+                                    key={star} 
+                                    size={16} 
+                                    className={star <= reviewsByBooking[trip._id]!.rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"} 
+                                  />
+                                ))}
+                              </div>
+                              {reviewsByBooking[trip._id]!.comment && (
+                                <p className="text-sm text-gray-700 italic">"{reviewsByBooking[trip._id]!.comment}"</p>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="bg-white p-4 rounded-xl shadow-sm border border-blue-100">
+                              <div className="text-sm font-bold text-gray-800 mb-2">Đánh giá tài xế</div>
+                              <div className="flex gap-2 mb-3">
+                                {[1, 2, 3, 4, 5].map(star => {
+                                  const currentRating = reviewForm[trip._id]?.rating || 0;
+                                  return (
+                                    <button 
+                                      key={star}
+                                      onClick={() => handleRatingChange(trip._id, star)}
+                                      className="transition-transform hover:scale-110 focus:outline-none"
+                                    >
+                                      <Star 
+                                        size={24} 
+                                        className={star <= currentRating ? "fill-yellow-400 text-yellow-400" : "text-gray-300 hover:text-yellow-300"} 
+                                      />
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              <div className="flex gap-2">
+                                <input 
+                                  type="text" 
+                                  placeholder="Nhận xét của bạn (không bắt buộc)..." 
+                                  value={reviewForm[trip._id]?.comment || ''}
+                                  onChange={(e) => handleCommentChange(trip._id, e.target.value)}
+                                  className="flex-1 text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-emerald-500"
+                                />
+                                <button 
+                                  onClick={() => handleSubmitReview(trip._id)}
+                                  disabled={submitting || !(reviewForm[trip._id]?.rating > 0)}
+                                  className="bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-1 transition-colors"
+                                >
+                                  {submitting ? <Loader size={16} className="animate-spin" /> : <Send size={16} />}
+                                  Gửi
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 

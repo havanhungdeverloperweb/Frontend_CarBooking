@@ -107,6 +107,7 @@ export interface BookingStatus {
 export interface PriceCalculationRequest {
   seats: number;
   distance: number;
+  passengers?: number;
 }
 
 export interface PriceCalculationResponse {
@@ -114,6 +115,11 @@ export interface PriceCalculationResponse {
   seats: number;
   vehicle_type: string;
   distance: number;
+  passengers?: number;
+  base_fare?: number;
+  per_km_per_person?: number;
+  variable_fare?: number;
+  min_fare?: number;
 }
 
 export interface CancelBookingRequest {

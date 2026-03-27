@@ -23,8 +23,6 @@ interface BookingsTabProps {
   onAssignDriver?: (booking: Booking) => void;
 }
 
-// Helper to safely extract data from API responses
-// Handles both direct array responses and { data: [] } format
 const extractDataArray = <T,>(response: any): T[] => {
   if (Array.isArray(response)) return response;
   if (response && Array.isArray(response.data)) return response.data;
@@ -32,7 +30,6 @@ const extractDataArray = <T,>(response: any): T[] => {
   return [];
 };
 
-// Helper to safely extract assignment from assign response
 const extractAssignment = (response: any): any => {
   if (response.assignment) return response.assignment;
   if (response.data?.assignment) return response.data.assignment;
@@ -41,12 +38,12 @@ const extractAssignment = (response: any): any => {
 
 export default function BookingsTab({ onViewBooking, onAssignDriver }: BookingsTabProps) {
   const dispatch = useAppDispatch();
-  
+
   // Redux state
   const { bookings, stats, loading, error, pagination, filters } = useAppSelector(
     (state) => state.staffBooking
   );
-  
+
   // Local state
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
@@ -59,8 +56,7 @@ export default function BookingsTab({ onViewBooking, onAssignDriver }: BookingsT
     search: filters.search || ''
   });
   const [isMobile, setIsMobile] = useState(false);
-  
-  // Assignment modal state
+
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const [assigningBooking, setAssigningBooking] = useState<Booking | null>(null);
   const [selectedDriverId, setSelectedDriverId] = useState('');
@@ -70,8 +66,10 @@ export default function BookingsTab({ onViewBooking, onAssignDriver }: BookingsT
   const [availableDrivers, setAvailableDrivers] = useState<any[]>([]);
   const [availableVehicles, setAvailableVehicles] = useState<any[]>([]);
   const [carpools, setCarpools] = useState<CarpoolAssignmentOption[]>([]);
+  const [activeTrips, setActiveTrips] = useState<any[]>([]);
   const [assignMode, setAssignMode] = useState<'new' | 'carpool'>('new');
   const [selectedCarpoolKey, setSelectedCarpoolKey] = useState('');
+  const [selectedTripId, setSelectedTripId] = useState('');
   const [loadingAssignData, setLoadingAssignData] = useState(false);
 
   // Check mobile view
@@ -100,7 +98,7 @@ export default function BookingsTab({ onViewBooking, onAssignDriver }: BookingsT
       dispatch(fetchBookings(filters));
       dispatch(fetchBookingStats());
     }, 30000);
-    
+
     return () => clearInterval(interval);
   }, [dispatch, filters]);
 
@@ -116,9 +114,19 @@ export default function BookingsTab({ onViewBooking, onAssignDriver }: BookingsT
     try {
       const res = await staffBookingApi.getAssignmentOptions(seats);
       if (res.success && res.data) {
-        setCarpools(res.data.carpools || []);
+        const carpoolList = res.data.carpools || [];
+        const tripList = res.data.activeTrips || [];
+        setCarpools(carpoolList);
+        setActiveTrips(tripList);
         setAvailableDrivers(res.data.idleDrivers || []);
         setAvailableVehicles(res.data.readyVehicles || []);
+        // Ưu tiên hiển thị activeTrips (Trip entity), fallback về carpools
+        const hasCarpoolable = tripList.length > 0 || carpoolList.length > 0;
+        if (hasCarpoolable) {
+          setAssignMode('carpool');
+        } else {
+          setAssignMode('new');
+        }
       }
     } catch (error) {
       console.error('Error loading assignment options:', error);
@@ -146,7 +154,7 @@ export default function BookingsTab({ onViewBooking, onAssignDriver }: BookingsT
         bookingId,
         payload: { notes: `Xác nhận bởi nhân viên lúc ${new Date().toLocaleString('vi-VN')}` }
       })).unwrap();
-      
+
       dispatch(fetchBookingStats());
     } catch (error: any) {
       console.error('Confirm failed:', error);
@@ -156,20 +164,20 @@ export default function BookingsTab({ onViewBooking, onAssignDriver }: BookingsT
 
   const handleCancelBooking = async () => {
     if (!selectedBooking) return;
-    
+
     try {
       const status: BookingStatus = 'cancelled';
-      
+
       await dispatch(updateBookingStatus({
         bookingId: selectedBooking._id,
-        payload: { 
-          status: status, 
+        payload: {
+          status: status,
           reason: cancelReason || 'Khách hàng hủy'
         }
       })).unwrap();
-      
+
       dispatch(fetchBookingStats());
-      
+
       setShowCancelModal(false);
       setSelectedBooking(null);
       setCancelReason('');
@@ -185,6 +193,7 @@ export default function BookingsTab({ onViewBooking, onAssignDriver }: BookingsT
     setSelectedDriverId('');
     setSelectedVehicleId('');
     setSelectedCarpoolKey('');
+    setSelectedTripId('');
     setAssignMode('new');
     setStartTime('');
     setShowAssignmentModal(true);
@@ -193,17 +202,17 @@ export default function BookingsTab({ onViewBooking, onAssignDriver }: BookingsT
   // Xử lý phân công
   const handleAssignDriver = async () => {
     if (!assigningBooking) return;
-    
+
     if (!selectedDriverId) {
       alert('Vui lòng chọn tài xế');
       return;
     }
-    
+
     if (!selectedVehicleId) {
       alert('Vui lòng chọn xe');
       return;
     }
-    
+
     // Kiểm tra số ghế xe phù hợp
     const selectedVehicle = availableVehicles.find(v => v._id === selectedVehicleId)
       || carpools.find(c => c.vehicle_id === selectedVehicleId)?.vehicle;
@@ -229,7 +238,7 @@ export default function BookingsTab({ onViewBooking, onAssignDriver }: BookingsT
     }
 
     setAssigning(true);
-    
+
     try {
       const result = await dispatch(assignDriverAndVehicle({
         bookingId: assigningBooking._id,
@@ -239,21 +248,21 @@ export default function BookingsTab({ onViewBooking, onAssignDriver }: BookingsT
           startTime: startTime || undefined
         }
       })).unwrap();
-      
+
       console.log('Assign result:', result);
-      
+
       // Extract assignment data safely
       const assignment = extractAssignment(result);
       const driverName = assignment.driver?.name || '';
       const vehicleName = assignment.vehicle?.vehicle_name || '';
       const licensePlate = assignment.vehicle?.license_plate || '';
-      
+
       alert(`Phân công thành công!\nTài xế: ${driverName}\nXe: ${vehicleName} (${licensePlate})`);
-      
+
       // Refresh danh sách bookings
       dispatch(fetchBookings(filters));
       dispatch(fetchBookingStats());
-      
+
       // Đóng modal
       setShowAssignmentModal(false);
       setAssigningBooking(null);
@@ -262,7 +271,7 @@ export default function BookingsTab({ onViewBooking, onAssignDriver }: BookingsT
       setSelectedCarpoolKey('');
       setAssignMode('new');
       setStartTime('');
-      
+
     } catch (error: any) {
       console.error('Assign failed:', error);
       alert(error || 'Phân công thất bại. Vui lòng thử lại.');
@@ -374,28 +383,28 @@ export default function BookingsTab({ onViewBooking, onAssignDriver }: BookingsT
 
       {/* Stats Cards - Responsive Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
-        <StatCard 
-          label="Tổng Booking" 
-          value={stats?.total || 0} 
-          color="bg-blue-500" 
+        <StatCard
+          label="Tổng Booking"
+          value={stats?.total || 0}
+          color="bg-blue-500"
           icon="📊"
         />
-        <StatCard 
-          label="Chờ Xác Nhận" 
-          value={stats?.pending || 0} 
-          color="bg-yellow-500" 
+        <StatCard
+          label="Chờ Xác Nhận"
+          value={stats?.pending || 0}
+          color="bg-yellow-500"
           icon="⏳"
         />
-        <StatCard 
-          label="Đang Thực Hiện" 
-          value={(stats?.inProgress || 0) + (stats?.assigned || 0)} 
-          color="bg-emerald-500" 
+        <StatCard
+          label="Đang Thực Hiện"
+          value={(stats?.inProgress || 0) + (stats?.assigned || 0)}
+          color="bg-emerald-500"
           icon="🚗"
         />
-        <StatCard 
-          label="Hoàn Thành" 
-          value={stats?.completed || 0} 
-          color="bg-gray-500" 
+        <StatCard
+          label="Hoàn Thành"
+          value={stats?.completed || 0}
+          color="bg-gray-500"
           icon="✅"
         />
       </div>
@@ -434,11 +443,10 @@ export default function BookingsTab({ onViewBooking, onAssignDriver }: BookingsT
           {/* Date Filter Toggle */}
           <button
             onClick={() => setShowDateFilter(!showDateFilter)}
-            className={`px-3 py-2.5 rounded-xl flex items-center justify-center gap-2 text-sm transition-colors ${
-              showDateFilter || tempFilters.startDate || tempFilters.endDate
+            className={`px-3 py-2.5 rounded-xl flex items-center justify-center gap-2 text-sm transition-colors ${showDateFilter || tempFilters.startDate || tempFilters.endDate
                 ? 'bg-emerald-500 text-white'
                 : 'border border-gray-200 text-gray-600 hover:bg-gray-50'
-            }`}
+              }`}
           >
             <Calendar size={16} />
             <span className={isMobile ? 'hidden sm:inline' : 'inline'}>Lọc ngày</span>
@@ -451,7 +459,7 @@ export default function BookingsTab({ onViewBooking, onAssignDriver }: BookingsT
             <Search size={16} />
             <span className={isMobile ? 'hidden sm:inline' : 'inline'}>Tìm</span>
           </button>
-          
+
           <button
             onClick={handleResetFilters}
             className="px-3 py-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 text-sm"
@@ -586,7 +594,7 @@ export default function BookingsTab({ onViewBooking, onAssignDriver }: BookingsT
                           >
                             <Eye size={16} />
                           </button>
-                          
+
                           {booking.status === 'pending' && (
                             <>
                               <button
@@ -608,7 +616,7 @@ export default function BookingsTab({ onViewBooking, onAssignDriver }: BookingsT
                               </button>
                             </>
                           )}
-                          
+
                           {booking.status === 'confirmed' && (
                             <button
                               onClick={() => handleOpenAssignModal(booking)}
@@ -645,7 +653,7 @@ export default function BookingsTab({ onViewBooking, onAssignDriver }: BookingsT
                       const total = pagination.totalPages;
                       const current = pagination.currentPage;
                       let pages: number[] = [];
-                      
+
                       if (total <= 5) {
                         pages = Array.from({ length: total }, (_, i) => i + 1);
                       } else if (current <= 3) {
@@ -659,18 +667,17 @@ export default function BookingsTab({ onViewBooking, onAssignDriver }: BookingsT
                         <button
                           key={pageNum}
                           onClick={() => handlePageChange(pageNum)}
-                          className={`min-w-8 h-8 px-2 rounded-lg text-sm transition-colors ${
-                            pagination.currentPage === pageNum
+                          className={`min-w-8 h-8 px-2 rounded-lg text-sm transition-colors ${pagination.currentPage === pageNum
                               ? 'bg-emerald-500 text-white'
                               : 'border border-gray-200 hover:bg-gray-50'
-                          }`}
+                            }`}
                         >
                           {pageNum}
                         </button>
                       ));
                     })()}
                   </div>
-                  
+
                   <button
                     onClick={() => handlePageChange(pagination.currentPage + 1)}
                     disabled={pagination.currentPage === pagination.totalPages}
@@ -698,7 +705,7 @@ export default function BookingsTab({ onViewBooking, onAssignDriver }: BookingsT
                 Hủy đơn của{' '}
                 <span className="font-bold text-gray-900">{selectedBooking.customer_name}</span>?
               </p>
-              
+
               <div className="mb-4">
                 <label className="block text-xs font-medium text-gray-700 mb-2 text-left">
                   Lý do hủy (tùy chọn)
@@ -711,7 +718,7 @@ export default function BookingsTab({ onViewBooking, onAssignDriver }: BookingsT
                   placeholder="Nhập lý do hủy đơn..."
                 />
               </div>
-              
+
               <div className="flex gap-3">
                 <button
                   onClick={() => {
@@ -792,166 +799,205 @@ export default function BookingsTab({ onViewBooking, onAssignDriver }: BookingsT
                 </div>
               </div>
 
-              <div className="rounded-xl border border-gray-200 p-4 bg-emerald-50/40">
-                <p className="text-sm font-semibold text-gray-800 mb-3">Hình thức phân công</p>
-                <div className="flex flex-col gap-2">
-                  <label className="flex items-start gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="assignMode"
-                      checked={assignMode === 'new'}
-                      onChange={() => {
-                        setAssignMode('new');
-                        setSelectedCarpoolKey('');
-                        setSelectedDriverId('');
-                        setSelectedVehicleId('');
-                      }}
-                      className="mt-1"
-                    />
-                    <span>
-                      <span className="font-medium text-gray-900">Tài xế rảnh + xe mới</span>
-                      <span className="block text-xs text-gray-600">
-                        Chỉ tài xế chưa có chuyến đang chạy và xe đang ở trạng thái sẵn sàng (mỗi tài xế một xe).
-                      </span>
-                    </span>
-                  </label>
-                  <label className={`flex items-start gap-2 cursor-pointer ${carpools.length === 0 ? 'opacity-50' : ''}`}>
-                    <input
-                      type="radio"
-                      name="assignMode"
-                      checked={assignMode === 'carpool'}
-                      disabled={carpools.length === 0}
-                      onChange={() => {
-                        setAssignMode('carpool');
-                        setSelectedDriverId('');
-                        setSelectedVehicleId('');
-                        setSelectedCarpoolKey('');
-                      }}
-                      className="mt-1"
-                    />
-                    <span>
-                      <span className="font-medium text-gray-900">Ghép vào chuyến đang chạy (còn chỗ)</span>
-                      <span className="block text-xs text-gray-600">
-                        Cùng tài xế và xe; chỉ khi còn đủ chỗ trống cho số khách trong đơn ({assigningBooking.passengers} người).
-                      </span>
-                    </span>
-                  </label>
-                </div>
-              </div>
-
-              {assignMode === 'carpool' && (
+              {/* === GỢI Ý GHÉP CHUYẾN (dùng Trip entity) === */}
+              {(activeTrips.length > 0 || carpools.length > 0) && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    <Car className="inline mr-2" size={16} />
-                    Chọn tài xế – xe đang chạy <span className="text-red-500">*</span>
-                  </label>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-sm font-semibold text-emerald-700">Gợi ý ghép chuyến đang chạy</span>
+                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs">
+                      {activeTrips.length > 0 ? activeTrips.length : carpools.length} chuyến còn chỗ
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-2">Bấm chọn để tự động điền tài xế &amp; xe bên dưới. Bỏ chọn hoặc thay lại tay nếu cần.</p>
                   {loadingAssignData ? (
                     <div className="text-center py-4">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-500 mx-auto"></div>
                     </div>
-                  ) : carpools.length === 0 ? (
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-900">
-                      Không có chuyến {assigningBooking.seats} chỗ nào còn chỗ để ghép. Hãy dùng &quot;Tài xế rảnh + xe mới&quot;.
-                    </div>
                   ) : (
-                    <select
-                      value={selectedCarpoolKey}
-                      onChange={(e) => {
-                        const key = e.target.value;
-                        setSelectedCarpoolKey(key);
-                        const c = carpools.find((x) => `${x.driver_id}_${x.vehicle_id}` === key);
-                        if (c) {
-                          setSelectedDriverId(c.driver_id);
-                          setSelectedVehicleId(c.vehicle_id);
-                        } else {
-                          setSelectedDriverId('');
-                          setSelectedVehicleId('');
-                        }
-                      }}
-                      className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-sm"
-                    >
-                      <option value="">-- Chọn cặp tài xế – xe --</option>
-                      {carpools.map((c) => (
-                        <option key={`${c.driver_id}_${c.vehicle_id}`} value={`${c.driver_id}_${c.vehicle_id}`}>
-                          {c.driver.name} · {c.vehicle.license_plate} · đã {c.usedPassengers}/{c.vehicle.seats} khách · còn{' '}
-                          {c.availableSeats} chỗ
-                        </option>
-                      ))}
-                    </select>
+                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                      {/* Dùng activeTrips (Trip entity) nếu có, fallback về carpools */}
+                      {activeTrips.length > 0
+                        ? activeTrips.map((t) => {
+                            const isSelected = selectedTripId === t.trip_id;
+                            return (
+                              <div
+                                key={t.trip_id}
+                                onClick={() => {
+                                  const newId = isSelected ? '' : t.trip_id;
+                                  setSelectedTripId(newId);
+                                  setSelectedCarpoolKey('');
+                                  if (newId) {
+                                    setSelectedDriverId(t.driver_id);
+                                    setSelectedVehicleId(t.vehicle_id);
+                                    setAssignMode('carpool');
+                                  } else {
+                                    setSelectedDriverId('');
+                                    setSelectedVehicleId('');
+                                    setAssignMode('new');
+                                  }
+                                }}
+                                className={`border rounded-xl p-3 cursor-pointer transition-all ${
+                                  isSelected
+                                    ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200'
+                                    : 'border-gray-200 hover:border-emerald-300 hover:bg-gray-50'
+                                }`}
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium text-sm text-gray-900 flex items-center gap-1.5">
+                                      🚗 {t.vehicle.vehicle_name} · {t.vehicle.license_plate}
+                                      <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-xs font-mono">{t.trip_code}</span>
+                                    </div>
+                                    <div className="text-xs text-gray-500 mt-0.5 truncate">📍 {t.route}</div>
+                                    <div className="text-xs text-gray-600 mt-0.5">👤 {t.driver.name}</div>
+                                    {t.bookings && t.bookings.length > 0 && (
+                                      <div className="flex flex-wrap gap-1 mt-1.5">
+                                        {t.bookings.map((b: any, i: number) => (
+                                          <span key={i} className="px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-xs">
+                                            {b.customer_name} ({b.passengers}ng)
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="text-right shrink-0">
+                                    <div className="text-sm font-bold text-emerald-600">{t.availableSeats} chỗ trống</div>
+                                    <div className="text-xs text-gray-400">{t.total_passengers}/{t.max_passengers}</div>
+                                    <div className="w-16 h-1.5 bg-gray-200 rounded-full mt-1 overflow-hidden">
+                                      <div
+                                        className="h-full bg-emerald-400 rounded-full"
+                                        style={{ width: `${(t.total_passengers / t.max_passengers) * 100}%` }}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        : carpools.map((c) => {
+                            const key = `${c.driver_id}_${c.vehicle_id}`;
+                            const isSelected = selectedCarpoolKey === key;
+                            return (
+                              <div
+                                key={key}
+                                onClick={() => {
+                                  const newKey = isSelected ? '' : key;
+                                  setSelectedCarpoolKey(newKey);
+                                  setSelectedTripId('');
+                                  if (newKey) {
+                                    setSelectedDriverId(c.driver_id);
+                                    setSelectedVehicleId(c.vehicle_id);
+                                    setAssignMode('carpool');
+                                  } else {
+                                    setSelectedDriverId('');
+                                    setSelectedVehicleId('');
+                                    setAssignMode('new');
+                                  }
+                                }}
+                                className={`border rounded-xl p-3 cursor-pointer transition-all ${
+                                  isSelected
+                                    ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200'
+                                    : 'border-gray-200 hover:border-emerald-300 hover:bg-gray-50'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1">
+                                    <div className="font-medium text-sm text-gray-900">🚗 {c.vehicle.vehicle_name} · {c.vehicle.license_plate}</div>
+                                    <div className="text-xs text-gray-600 mt-0.5">👤 {c.driver.name}</div>
+                                  </div>
+                                  <div className="text-right ml-3 shrink-0">
+                                    <div className="text-sm font-bold text-emerald-600">{c.availableSeats} chỗ trống</div>
+                                    <div className="text-xs text-gray-400">{c.usedPassengers}/{c.vehicle.seats}</div>
+                                    <div className="w-16 h-1.5 bg-gray-200 rounded-full mt-1 overflow-hidden">
+                                      <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${(c.usedPassengers / c.vehicle.seats) * 100}%` }} />
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                    </div>
                   )}
                 </div>
               )}
 
-              {assignMode === 'new' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      <User className="inline mr-2" size={16} />
-                      Chọn tài xế <span className="text-red-500">*</span>
-                    </label>
-                    {loadingAssignData ? (
-                      <div className="text-center py-4">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-500 mx-auto"></div>
-                        <p className="text-xs text-gray-500 mt-2">Đang tải danh sách tài xế...</p>
-                      </div>
-                    ) : availableDrivers.length === 0 ? (
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-center">
-                        <p className="text-sm text-yellow-700">Không có tài xế rảnh (chưa có chuyến đang chạy).</p>
-                      </div>
-                    ) : (
-                      <select
-                        value={selectedDriverId}
-                        onChange={(e) => setSelectedDriverId(e.target.value)}
-                        className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
-                      >
-                        <option value="">-- Chọn tài xế --</option>
-                        {availableDrivers.map((driver) => (
-                          <option key={driver._id} value={driver._id}>
-                            {driver.name} - {driver.phone} ({driver.status_text || driver.status})
-                          </option>
-                        ))}
-                      </select>
-                    )}
+              {/* === CHỌN TÀI XẾ (luôn hiện) === */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <User className="inline mr-2" size={16} />
+                  Chọn tài xế <span className="text-red-500">*</span>
+                </label>
+                {loadingAssignData ? (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-500 mx-auto"></div>
                   </div>
+                ) : (
+                  <select
+                    value={selectedDriverId}
+                    onChange={(e) => {
+                      setSelectedDriverId(e.target.value);
+                      setSelectedCarpoolKey('');
+                      setAssignMode('new');
+                    }}
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                  >
+                    <option value="">-- Chọn tài xế --</option>
+                    {availableDrivers.map((driver) => (
+                      <option key={driver._id} value={driver._id}>
+                        {driver.name} - {driver.phone}
+                      </option>
+                    ))}
+                    {/* Thêm các tài xế đang trong chuyến ghép vào dropdown */}
+                    {carpools.length > 0 && availableDrivers.length > 0 && (
+                      <option disabled>──────────────────</option>
+                    )}
+                    {carpools.map((c) => (
+                      <option key={`carpool-drv-${c.driver_id}`} value={c.driver_id}>
+                        {c.driver.name} (đang chạy – còn {c.availableSeats} chỗ)
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      <Car className="inline mr-2" size={16} />
-                      Chọn xe <span className="text-red-500">*</span>
-                    </label>
-                    {loadingAssignData ? (
-                      <div className="text-center py-4">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-500 mx-auto"></div>
-                        <p className="text-xs text-gray-500 mt-2">Đang tải danh sách xe...</p>
-                      </div>
-                    ) : getFilteredVehicles().length === 0 ? (
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-center">
-                        <p className="text-sm text-yellow-700">
-                          Không có xe {assigningBooking.seats} chỗ nào sẵn sàng
-                        </p>
-                      </div>
-                    ) : (
-                      <select
-                        value={selectedVehicleId}
-                        onChange={(e) => setSelectedVehicleId(e.target.value)}
-                        className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
-                      >
-                        <option value="">-- Chọn xe --</option>
-                        {getFilteredVehicles().map((vehicle) => (
-                          <option key={vehicle._id} value={vehicle._id}>
-                            {vehicle.vehicle_name} - {vehicle.license_plate} ({vehicle.seats} chỗ)
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                    {assigningBooking && getFilteredVehicles().length > 0 && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        * Mỗi tài xế chỉ gắn một xe; xe phải đúng {assigningBooking.seats} chỗ theo đơn
-                      </p>
-                    )}
+              {/* === CHỌN XE (luôn hiện) === */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Car className="inline mr-2" size={16} />
+                  Chọn xe <span className="text-red-500">*</span>
+                </label>
+                {loadingAssignData ? (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-500 mx-auto"></div>
                   </div>
-                </>
-              )}
+                ) : (
+                  <select
+                    value={selectedVehicleId}
+                    onChange={(e) => {
+                      setSelectedVehicleId(e.target.value);
+                      setSelectedCarpoolKey('');
+                      setAssignMode('new');
+                    }}
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                  >
+                    <option value="">-- Chọn xe --</option>
+                    {getFilteredVehicles().map((vehicle) => (
+                      <option key={vehicle._id} value={vehicle._id}>
+                        {vehicle.vehicle_name} - {vehicle.license_plate} ({vehicle.seats} chỗ)
+                      </option>
+                    ))}
+                    {/* Thêm xe đang trong chuyến ghép */}
+                    {carpools.length > 0 && getFilteredVehicles().length > 0 && (
+                      <option disabled>──────────────────</option>
+                    )}
+                    {carpools.map((c) => (
+                      <option key={`carpool-veh-${c.vehicle_id}`} value={c.vehicle_id}>
+                        {c.vehicle.vehicle_name} - {c.vehicle.license_plate} (còn {c.availableSeats} chỗ)
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
 
               {/* Start Time (Optional) */}
               <div>

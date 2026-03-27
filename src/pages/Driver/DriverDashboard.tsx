@@ -16,6 +16,7 @@ import ActiveTrips from './ActiveTrips';
 import TripHistory from './TripHistory';
 import DriverStats from './DriverStats';
 import DriverStatusBadge from './DriverStatusBadge';
+import DriverReviewsList from './DriverReviewsList';
 
 export default function DriverDashboard() {
   const navigate = useNavigate();
@@ -25,7 +26,7 @@ export default function DriverDashboard() {
   
   const [allTrips, setAllTrips] = useState<DriverTrip[]>([]);
   const [stats, setStats] = useState<DriverTripStats>({ totalTrips: 0, completedTrips: 0, earnings: 0, rating: 0 });
-  const [activeTab, setActiveTab] = useState<'active' | 'history' | 'stats'>('active');
+  const [activeTab, setActiveTab] = useState<'active' | 'history' | 'stats' | 'reviews'>('active');
   const [historySource, setHistorySource] = useState<HistoryFilter>('all');
   const [loading, setLoading] = useState(true);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -351,6 +352,19 @@ export default function DriverDashboard() {
             </div>
           </button>
           <button 
+            onClick={() => setActiveTab('reviews')}
+            className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${
+              activeTab === 'reviews' 
+                ? 'bg-gray-900 text-white shadow-md' 
+                : 'text-gray-500 hover:bg-gray-50'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Star size={18} />
+              Đánh Giá
+            </div>
+          </button>
+          <button 
             type="button"
             onClick={() => navigate('/driver/create-trip')}
             className="px-5 py-2.5 rounded-xl font-bold text-sm transition-all text-gray-500 hover:bg-gray-50 flex items-center gap-2"
@@ -368,7 +382,7 @@ export default function DriverDashboard() {
             transition={{ duration: 0.2 }}
           >
             {activeTab === 'stats' ? (
-              <DriverStats stats={stats} />
+              <DriverStats stats={stats} trips={allTrips} />
             ) : activeTab === 'active' ? (
               <ActiveTrips
                 trips={activeTrips}
@@ -376,6 +390,8 @@ export default function DriverDashboard() {
                 onComplete={handleCompleteTrip}
                 loading={tripsLoading}
               />
+            ) : activeTab === 'reviews' ? (
+              <DriverReviewsList />
             ) : (
               <TripHistory
                 trips={completedTrips}

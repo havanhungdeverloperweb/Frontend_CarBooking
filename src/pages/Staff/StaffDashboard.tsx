@@ -15,6 +15,7 @@ import StatsTab from './StatsTab';
 import DriversTab from './DriversTab';
 import VehiclesTab from './VehiclesTab';
 import CustomersTab from './CustomersTab';
+import PaymentsTab from './PaymentsTab';
 import { Booking } from '../../types/Booking.types';
 import { Customer, CustomerBooking } from '../../types/StaffCustomer.types';
 
@@ -33,7 +34,7 @@ export default function StaffDashboard() {
   const [occupancy, setOccupancy] = useState<any[]>([]);
   const [assignment, setAssignment] = useState({ driverId: '', vehicleId: '' });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'bookings' | 'drivers' | 'vehicles' | 'customers' | 'stats'>('bookings');
+  const [activeTab, setActiveTab] = useState<'bookings' | 'drivers' | 'vehicles' | 'customers' | 'stats' | 'payments'>('bookings');
   const [isLoading, setIsLoading] = useState(true);
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const [bookingToAssign, setBookingToAssign] = useState<Booking | null>(null);
@@ -95,11 +96,11 @@ export default function StaffDashboard() {
 
   // Fetch vehicles and drivers when needed
   useEffect(() => {
-    if (staffInfo && !isLoading && (activeTab === 'vehicles' || activeTab === 'drivers')) {
-      if (activeTab === 'vehicles') {
+    if (staffInfo && !isLoading && (activeTab === 'vehicles' || activeTab === 'drivers' || activeTab === 'stats')) {
+      if (activeTab === 'vehicles' || activeTab === 'stats') {
         dispatch(fetchAllVehicles());
       }
-      if (activeTab === 'drivers') {
+      if (activeTab === 'drivers' || activeTab === 'stats') {
         dispatch(fetchAllDrivers());
       }
     }
@@ -221,6 +222,7 @@ export default function StaffDashboard() {
   // Menu items for mobile
   const menuItems = [
     { id: 'bookings', label: 'Đơn Hàng', icon: Calendar },
+    { id: 'payments', label: 'Thanh Toán', icon: BarChart3 }, // Dùng tạm icon phụ trên mobile
     { id: 'drivers', label: 'Tài Xế', icon: Users },
     { id: 'vehicles', label: 'Xe', icon: Car },
     { id: 'customers', label: 'Khách Hàng', icon: User },
@@ -266,6 +268,7 @@ export default function StaffDashboard() {
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 capitalize">
             {activeTab === 'bookings' && 'Quản Lý Đơn Hàng'}
+            {activeTab === 'payments' && 'Quản Lý Thanh Toán'}
             {activeTab === 'drivers' && 'Quản Lý Tài Xế'}
             {activeTab === 'vehicles' && 'Quản Lý Phương Tiện'}
             {activeTab === 'customers' && 'Quản Lý Khách Hàng'}
@@ -313,6 +316,10 @@ export default function StaffDashboard() {
             onViewBooking={setViewingBooking}
             onAssignDriver={handleAssignDriver}
           />
+        )}
+
+        {activeTab === 'payments' && (
+          <PaymentsTab onViewBooking={setViewingBooking} />
         )}
 
         {activeTab === 'stats' && (

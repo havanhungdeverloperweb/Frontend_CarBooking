@@ -135,7 +135,7 @@ export default function DriversTab(props: DriversTabProps) {
   );
 
   const StatusBadge = ({ status }: { status: string }) => {
-    const statusConfig: Record<string, { label: string; color: string; icon: JSX.Element }> = {
+    const statusConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
       active: {
         label: 'Đang hoạt động',
         color: 'bg-emerald-100 text-emerald-700',

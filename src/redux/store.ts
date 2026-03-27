@@ -12,6 +12,7 @@ import tripReducer from './Trip/Trip.Slice';
 import driverTripReducer from './DriverTrip/DriverTrip.Slice'; 
 import driverSelfTripReducer from './DriverSelfTrip/DriverSelfTrip.Slice';
 import paymentReducer from './Payment/Payment.Slice';
+import driverReviewReducer from './DriverReview/DriverReview.Slice';
 
 export const store = configureStore({
   reducer: {
@@ -25,7 +26,8 @@ export const store = configureStore({
     trip: tripReducer,
     driverTrip: driverTripReducer,
     driverSelfTrip: driverSelfTripReducer,
-    payment: paymentReducer
+    payment: paymentReducer,
+    driverReview: driverReviewReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

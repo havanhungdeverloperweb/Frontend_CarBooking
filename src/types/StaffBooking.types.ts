@@ -137,8 +137,30 @@ export interface CarpoolAssignmentOption {
   }>;
 }
 
+export interface ActiveTripOption {
+  trip_id: string;
+  trip_code: string;
+  route: string;
+  driver_id: string;
+  driver: { name: string; phone: string };
+  vehicle_id: string;
+  vehicle: { vehicle_name: string; license_plate: string; seats: number };
+  total_passengers: number;
+  max_passengers: number;
+  availableSeats: number;
+  departure_time: string;
+  bookings: Array<{
+    booking_id: string;
+    customer_name?: string;
+    passengers: number;
+    pickup_point?: string;
+    dropoff_point?: string;
+  }>;
+}
+
 export interface AssignmentOptionsResponse {
   carpools: CarpoolAssignmentOption[];
+  activeTrips: ActiveTripOption[];
   idleDrivers: Driver[];
   readyVehicles: Vehicle[];
 }

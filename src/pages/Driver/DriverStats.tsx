@@ -1,27 +1,49 @@
 // src/pages/driver/DriverStats.tsx
-import { DriverTripStats } from '../../types/DriverTrip.types';
+import { DriverTrip, DriverTripStats } from '../../types/DriverTrip.types';
 import { TrendingUp, Star, Award, DollarSign, CheckCircle, Clock } from 'lucide-react';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 
 interface DriverStatsProps {
   stats: DriverTripStats;
+  trips: DriverTrip[];
 }
 
-export default function DriverStats({ stats }: DriverStatsProps) {
+export default function DriverStats({ stats, trips }: DriverStatsProps) {
   const completionRate = stats.totalTrips > 0 
     ? Math.round((stats.completedTrips / stats.totalTrips) * 100) 
     : 0;
 
-  // Sample earnings data (in real app, fetch from API)
-  const earningsData = [
-    { date: 'Thứ 2', earnings: 450000 },
-    { date: 'Thứ 3', earnings: 320000 },
-    { date: 'Thứ 4', earnings: 580000 },
-    { date: 'Thứ 5', earnings: 420000 },
-    { date: 'Thứ 6', earnings: 670000 },
-    { date: 'Thứ 7', earnings: 890000 },
-    { date: 'CN', earnings: 720000 },
-  ];
+  // Tính thu nhập theo từng ngày trong tuần hiện tại từ dữ liệu thực tế
+  const DAY_LABELS = ['CN', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+  const DAY_ORDER  = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'];
+
+  // Lấy đầu tuần (Thứ 2) và cuối tuần (CN) của tuần hiện tại
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0=CN, 1=T2, ..., 6=T7
+  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(today);
+  monday.setDate(today.getDate() + diffToMonday);
+  monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+
+  // Khởi tạo map tổng thu nhập từng ngày = 0
+  const earningsMap: Record<string, number> = {};
+  DAY_ORDER.forEach(d => { earningsMap[d] = 0; });
+
+  // Cộng dồn thu nhập từ chuyến đã hoàn thành trong tuần này
+  trips.forEach(trip => {
+    if (trip.booking_status !== 'completed') return;
+    const dateStr = trip.end_time || trip.trip_date;
+    if (!dateStr) return;
+    const d = new Date(dateStr);
+    if (d < monday || d > sunday) return;
+    const label = DAY_LABELS[d.getDay()];
+    earningsMap[label] = (earningsMap[label] || 0) + (trip.price || 0);
+  });
+
+  const earningsData = DAY_ORDER.map(date => ({ date, earnings: earningsMap[date] }));
 
   const ratingData = [
     { name: '5 sao', value: 42, color: '#10B981' },

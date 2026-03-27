@@ -125,12 +125,13 @@ export default function BookRide() {
     if (distance && formData.booking.seats && distance > 0) {
       dispatch(calculatePrice({
         seats: formData.booking.seats,
-        distance: distance
+        distance: distance,
+        passengers: formData.booking.passengers
       }));
     } else {
       dispatch(clearPriceCalculation());
     }
-  }, [distance, formData.booking.seats, dispatch]);
+  }, [distance, formData.booking.seats, formData.booking.passengers, dispatch]);
 
   // Update form price when calculation is done
   useEffect(() => {
