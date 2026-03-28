@@ -198,3 +198,4 @@ export default function StatsTab({ drivers, vehicles }: StatsTabProps) {
     </div>
   );
 }
+}
