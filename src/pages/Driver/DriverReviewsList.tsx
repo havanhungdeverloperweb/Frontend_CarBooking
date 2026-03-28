@@ -67,7 +67,7 @@ export default function DriverReviewsList() {
       <div className="grid gap-4 md:grid-cols-2">
         {driverReviews.length > 0 ? (
           driverReviews.map((review) => (
-            <div key={review._id} className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+            <div key={review._id} className="bg-white rounded-4xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <div className="font-bold text-gray-900 mb-1">{review.customer_name}</div>

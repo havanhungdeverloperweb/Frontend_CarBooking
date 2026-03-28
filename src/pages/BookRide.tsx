@@ -20,13 +20,11 @@ import {
 
 import {
   createPaymentForBooking,
-  // For transfer: chỉ cần tạo payment để lấy payUrl, không hiển thị QR form
 } from '../redux/Payment/Payment.Slice';
 
 import { VEHICLE_TYPE_OPTIONS, VehicleType } from '../types/VehicleType.types';
 import { BookingFormData, CreateBookingRequest } from '../types/Booking.types';
 
-// Fix Leaflet default icon issue
 let DefaultIcon = L.icon({
   iconUrl: markerIcon,
   shadowUrl: markerShadow,
@@ -35,7 +33,6 @@ let DefaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
-// Component to update map bounds
 function MapUpdater({ coords }: { coords: [number, number][] }) {
   const map = useMap();
   useEffect(() => {
@@ -47,7 +44,6 @@ function MapUpdater({ coords }: { coords: [number, number][] }) {
   return null;
 }
 
-// Component to handle map click events
 function MapEvents({ onMapClick }: { onMapClick: (lat: number, lon: number) => void }) {
   useMapEvents({
     click(e) {
@@ -806,7 +802,6 @@ export default function BookRide() {
   );
 }
 
-// Input Group Component
 function InputGroup({ label, icon, children }: { label: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
